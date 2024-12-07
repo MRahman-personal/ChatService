@@ -2,6 +2,7 @@ package com.studentchat.chatservice;
 
 import com.azure.messaging.servicebus.ServiceBusMessage;
 import com.azure.messaging.servicebus.ServiceBusSenderClient;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -17,6 +18,8 @@ public class ChatService {
 
     @Autowired
     private ServiceBusSenderClient serviceBusSenderClient;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public List<ChatMessage> getAllMessages() {
         return StreamSupport
@@ -39,10 +42,14 @@ public class ChatService {
     }
 
     private void sendLikeNotificationToServiceBus(ChatMessage message) {
-        // todo update message format
-        String notification = String.format("Message ID %s User %s Likes %d",
-                message.getId(), message.getUserId(), message.getLikes());
+        try {
+            String notificationJson = objectMapper.writeValueAsString(new LikeNotification(
+                    message.getId(), message.getUserId(), message.getLikes()));
 
-        serviceBusSenderClient.sendMessage(new ServiceBusMessage(notification));
+            serviceBusSenderClient.sendMessage(new ServiceBusMessage(notificationJson));
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to send notification to Service Bus", e);
+        }
     }
+
 }

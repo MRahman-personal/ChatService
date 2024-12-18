@@ -1,6 +1,7 @@
 package com.studentchat.chatservice;
 
 import com.azure.messaging.servicebus.ServiceBusClientBuilder;
+import com.azure.messaging.servicebus.ServiceBusReceiverClient;
 import com.azure.messaging.servicebus.ServiceBusSenderClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -20,6 +21,15 @@ public class ServiceBusConfig {
         return new ServiceBusClientBuilder()
                 .connectionString(connectionString)
                 .sender()
+                .queueName(queueName)
+                .buildClient();
+    }
+
+    @Bean
+    public ServiceBusReceiverClient serviceBusReceiverClient() {
+        return new ServiceBusClientBuilder()
+                .connectionString(connectionString)
+                .receiver()
                 .queueName(queueName)
                 .buildClient();
     }

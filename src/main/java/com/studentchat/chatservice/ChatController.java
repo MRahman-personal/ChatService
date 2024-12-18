@@ -18,6 +18,11 @@ public class ChatController {
         return chatService.getAllMessages();
     }
 
+    @GetMapping("/notifications/{id}")
+    public List<String> getNotifications(@PathVariable String id) {
+        return chatService.getLikeNotificationsByUserId(id, 100);
+    }
+
     @PostMapping("/send")
     public ChatMessage sendMessage(@RequestBody ChatMessage message) {
         return chatService.saveMessage(message);

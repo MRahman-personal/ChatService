@@ -8,11 +8,17 @@ import com.azure.messaging.servicebus.ServiceBusSenderClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
+import com.azure.messaging.servicebus.ServiceBusReceivedMessage;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class ChatService {
@@ -51,7 +57,7 @@ public class ChatService {
     private void sendLikeNotificationToServiceBus(ChatMessage message) {
         try {
             String notificationJson = objectMapper.writeValueAsString(new LikeNotification(
-                    message.getId(), message.getUserId(), message.getLikes()));
+                    message.getId(), message.getUserId(), message.getLikes(), message.getMessage()));
 
             serviceBusSenderClient.sendMessage(new ServiceBusMessage(notificationJson));
         } catch (Exception e) {
@@ -60,11 +66,24 @@ public class ChatService {
     }
 
     public List<String> getLikeNotificationsByUserId(String userId, int messageBatchSize) {
+        ObjectMapper objectMapper = new ObjectMapper();
 
-        IterableStream<ServiceBusReceivedMessage> peekedMessages = serviceBusReceiverClient.peekMessages(messageBatchSize);
+        List<ServiceBusReceivedMessage> peekedMessages = serviceBusReceiverClient.peekMessages(messageBatchSize, 1).stream().toList();
 
         return peekedMessages.stream()
-                .filter(message -> userId.equals(message.getApplicationProperties().get("userId")))
+                .filter(message -> {
+                    try {
+
+                        String messageBody = message.getBody().toString();
+                        JsonNode jsonNode = objectMapper.readTree(messageBody);
+
+                        JsonNode userIdNode = jsonNode.get("userId");
+                        return userIdNode != null && userId.equals(userIdNode.asText());
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        return false;
+                    }
+                })
                 .sorted(Comparator.comparing(ServiceBusReceivedMessage::getEnqueuedTime).reversed())
                 .limit(5)
                 .map(this::convertToLikeNotificationMessage)
@@ -72,11 +91,20 @@ public class ChatService {
     }
 
     private String convertToLikeNotificationMessage(ServiceBusReceivedMessage message) {
+        try {
+            ObjectMapper objectMapper = new ObjectMapper();
+            String messageText = message.getBody().toString();
+            JsonNode jsonNode = objectMapper.readTree(messageText);
 
-        String messageText = message.getBody().toString();
-        int likes = (int) message.getApplicationProperties().getOrDefault("likes", 0);
+            // Extract the fields safely
+            String content = jsonNode.has("content") ? jsonNode.get("content").asText() : "Unknown content";
+            int likes = jsonNode.has("likes") ? jsonNode.get("likes").asInt() : 0;
 
-        return String.format("Your message '%s' received %d likes", messageText, likes);
+            return String.format("Your message '%s' received %d likes", content, likes);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "Invalid message format";
+        }
     }
 
 }

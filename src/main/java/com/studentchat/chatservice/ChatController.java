@@ -19,8 +19,8 @@ public class ChatController {
     }
 
     @GetMapping("/notifications/{id}")
-    public List<String> getNotifications(@PathVariable String id) {
-        return chatService.getLikeNotificationsByUserId(id, 100);
+    public List<String> getAllNotifications(@PathVariable String id) {
+        return chatService.getLikeNotificationsByUserId(id, 20);
     }
 
     @PostMapping("/send")
